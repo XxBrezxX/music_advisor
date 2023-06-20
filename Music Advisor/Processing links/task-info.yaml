@@ -1053,6 +1053,416 @@ files:
         }
     }
   learner_created: false
-feedback_link: https://hyperskill.org/projects/62/stages/338/implement#comment
-status: Unchecked
-record: -1
+- name: src/advisor/utils/ProgramArguments.java
+  visible: true
+  text: |
+    package advisor.utils;
+    import org.kohsuke.args4j.CmdLineException;
+    import org.kohsuke.args4j.CmdLineParser;
+    import org.kohsuke.args4j.Option;
+
+    public class ProgramArguments {
+        @Option(name= "-access", usage = "Spotify Server Path")
+        private String serverPath = "https://accounts.spotify.com";
+
+        public String getServerPath() {
+            return serverPath;
+        }
+
+        public void setServerPath(String serverPath) {
+            this.serverPath = serverPath;
+        }
+    }
+  learner_created: true
+- name: src/advisor/server/AuthServer.java
+  visible: true
+  text: |
+    package advisor.server;
+
+    import advisor.server.handlers.SpotifyHandler;
+    import advisor.utils.SharedData;
+    import com.sun.net.httpserver.HttpServer;
+
+    import java.io.IOException;
+    import java.net.InetSocketAddress;
+
+    public class AuthServer {
+        final static int port = 8080;
+        final private HttpServer server;
+
+        public AuthServer(SharedData sharedData) throws IOException {
+            server = HttpServer.create(new InetSocketAddress(port), 0);
+
+            SpotifyHandler spotifyHandler = new SpotifyHandler(sharedData);
+            server.createContext("/login", spotifyHandler);
+        }
+
+        public void startServer() {
+            server.start();
+    //        System.out.println("Servidor iniciado en el puerto " + port);
+        }
+
+        public void stopServer() {
+    //        System.out.println("Server fin");
+            server.stop(1);
+        }
+    }
+  learner_created: true
+- name: src/advisor/utils/HttpUtilQueries.java
+  visible: true
+  text: |
+    package advisor.utils;
+
+    import java.io.IOException;
+    import java.net.URI;
+    import java.net.http.HttpClient;
+    import java.net.http.HttpRequest;
+    import java.net.http.HttpResponse;
+    import java.util.Base64;
+
+    public class HttpUtilQueries {
+
+        HttpClient httpClient;
+
+        public HttpUtilQueries() {
+        }
+
+        {
+            httpClient = HttpClient.newBuilder().build();
+        }
+
+        public void getRequest(String uri) throws IOException, InterruptedException {
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(uri))
+                    .GET()
+                    .build();
+            HttpResponse<String> httpResponse = this.httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            System.out.println(httpResponse.body());
+        }
+
+        public HttpResponse<String> postRequest(String uri, String request) throws IOException, InterruptedException {
+            String client_id = "309d98be14e14df9bdfe3bf3a4366ffd";
+            String client_secret = "5ea58477b4e44e73b806061cf767afa3";
+            String credentials = Base64.getEncoder().encodeToString((client_id + ":" + client_secret).getBytes());
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(uri))
+                    .header("Authorization", "Basic " + credentials)
+                    .header("Content-Type", "application/x-www-form-urlencoded")
+                    .POST(HttpRequest.BodyPublishers.ofString(request))
+                    .build();
+            return this.httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+        }
+
+    }
+  learner_created: true
+- name: src/advisor/providers/ApiProvider.java
+  visible: true
+  text: |
+    package advisor.providers;
+
+    import advisor.server.AuthServer;
+    import advisor.utils.HttpUtilQueries;
+    import advisor.utils.ProgramArguments;
+    import advisor.utils.SharedData;
+
+    import java.io.IOException;
+    import java.net.URL;
+    import java.net.URLEncoder;
+    import java.net.http.HttpResponse;
+    import java.nio.charset.StandardCharsets;
+    import java.text.MessageFormat;
+
+    public class ApiProvider {
+        private static final Object lock = new Object();
+        public boolean authorization;
+        private HttpUtilQueries httpUtilQueries;
+        final private SharedData sharedData;
+        private ProgramArguments programArguments;
+
+        public ApiProvider(ProgramArguments programArguments) {
+            this.programArguments = programArguments;
+        }
+
+        {
+            httpUtilQueries = new HttpUtilQueries();
+            sharedData = new SharedData();
+        }
+
+        public void setAuthorization(boolean auth) {
+            this.authorization = auth;
+        }
+
+        public boolean getAuth() {
+            return this.authorization;
+        }
+
+        //    featured — a list of Spotify-featured playlists with their links fetched from API;
+        //    new — a list of new albums with artists and links on Spotify;
+        //    categories — a list of all available categories on Spotify (just their names);
+        //    playlists C_NAME, where C_NAME is the name of category. The list contains playlists of this category and their links on Spotify;
+        //    exit shuts down the application.
+        public String getFeatured() {
+            if (!authorization) return "Please, provide access for application.";
+            return """
+                    ---FEATURED---
+                    Mellow Morning
+                    Wake Up and Smell the Coffee
+                    Monday Motivation
+                    Songs to Sing in the Shower""";
+        }
+
+        public String getNew() {
+            if (!authorization) return "Please, provide access for application.";
+            return """
+                    ---NEW RELEASES---
+                    Mountains [Sia, Diplo, Labrinth]
+                    Runaway [Lil Peep]
+                    The Greatest Show [Panic! At The Disco]
+                    All Out Life [Slipknot]""";
+        }
+
+        public String getCategories() {
+            if (!authorization) return "Please, provide access for application.";
+            return """
+                    ---CATEGORIES---
+                    Top Lists
+                    Pop
+                    Mood
+                    Latin""";
+        }
+
+        public String getPlaylists(String mood) {
+            if (!authorization) return "Please, provide access for application.";
+            StringBuilder stringBuilder = new StringBuilder("""
+                    ---MOOD PLAYLISTS---
+                    Walk Like A Badass \\s
+                    Rage Beats \\s
+                    Arab Mood Booster \\s
+                    Sunday Stroll\"""");
+            return stringBuilder.replace(3, 6, mood).toString();
+        }
+
+        public String getExit() {
+            return """
+                    ---GOODBYE!---""";
+        }
+
+        public String authorize() {
+    //        StringBuilder stringBuilder;
+    //        AuthServer authServer;
+    //        try {
+    //            authServer = new AuthServer(this.sharedData);
+    //            authServer.startServer();
+    //        } catch (IOException e) {
+    //            throw new RuntimeException(e);
+    //        }
+            stringBuilder = new StringBuilder(MessageFormat.format("use this link to request the access code:\n{0}/authorize?client_id=309d98be14e14df9bdfe3bf3a4366ffd&redirect_uri=http://127.0.0.1:8080/login&response_type=code\nwaiting for code...", programArguments.getServerPath()));
+            System.out.println(stringBuilder);
+            do {
+                synchronized (sharedData) {
+                    try {
+                        sharedData.wait();
+                        authorization = sharedData.isHasCode();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            } while (!authorization);
+            authServer.stopServer();
+            System.out.println(sharedData.isHasCode() ? "code received" : "code denied");
+            if (authorization) {
+                try {
+                    System.out.println("making http request for access_token...");
+                    String requestBody =
+                            "code=" + URLEncoder.encode(sharedData.getAuthCode(), StandardCharsets.UTF_8)
+                                    + "&redirect_uri=" + URLEncoder.encode("http://127.0.0.1:8080/login", StandardCharsets.UTF_8)
+                                    + "&grant_type=authorization_code";
+                    HttpResponse<String> response = httpUtilQueries.postRequest(
+                            programArguments.getServerPath() + "/api/token",
+                            requestBody
+                    );
+                    if (response.statusCode() == 200) {
+                        System.out.println("response:\n" + response.body());
+                    }
+                    return response.statusCode() == 200 ? "---SUCCESS---" : "---ERROR---";
+                } catch (IOException | InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            } else {
+                return "---ERROR---";
+            }
+        }
+
+    }
+  learner_created: true
+- name: src/advisor/server/handlers/SpotifyHandler.java
+  visible: true
+  text: |
+    package advisor.server.handlers;
+
+    import advisor.utils.SharedData;
+    import com.sun.net.httpserver.HttpExchange;
+    import com.sun.net.httpserver.HttpHandler;
+
+    import java.io.IOException;
+    import java.io.OutputStream;
+
+    public class SpotifyHandler implements HttpHandler {
+        private final SharedData sharedData;
+
+        public SpotifyHandler(SharedData sharedData) {
+            this.sharedData = sharedData;
+        }
+
+        protected String code;
+
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+    //        System.out.println("Entre al handler");
+    //        System.out.println(exchange);
+            String response = "";
+    //        System.out.println(exchange.getRequestURI());
+
+            String query = exchange.getRequestURI().getQuery();
+    //        System.out.println(query);
+    //        if(query.equals(null)) throw new RuntimeException("Error null");
+            if(query == null || !query.contains("code")){
+                response = "Authorization code not found. Try again.";
+    //            System.out.println(response);
+                exchange.sendResponseHeaders(400, response.getBytes().length);
+
+                OutputStream outputStream = exchange.getResponseBody();
+                outputStream.write(response.getBytes());
+                outputStream.flush();
+                outputStream.close();
+
+                sharedData.setHasCode(false);
+
+            } else {
+                response = "Got the code. Return back to your program.";
+    //            System.out.println(response);
+                exchange.sendResponseHeaders(200, response.getBytes().length);
+
+                OutputStream outputStream = exchange.getResponseBody();
+                outputStream.write(response.getBytes());
+                outputStream.flush();
+                outputStream.close();
+                String code = query.split("=")[1];
+
+                sharedData.setAuthCode(code);
+                sharedData.setHasCode(true);
+
+            }
+    //        exchange.getResponseHeaders().set("Content-Type", "text/plain");
+
+            synchronized (sharedData) {
+                sharedData.notify();
+            }
+    //        else if(requestPath.equals("/"))
+        }
+
+    }
+  learner_created: true
+- name: src/advisor/application/MenuApp.java
+  visible: true
+  text: |
+    package advisor.utils;
+
+    import advisor.providers.ApiProvider;
+    import advisor.server.AuthServer;
+
+    import java.io.IOException;
+    import java.util.Scanner;
+
+    public class MenuApp {
+        private ProgramArguments programArguments;
+
+        public MenuApp(ProgramArguments programArguments) {
+            this.programArguments = programArguments;
+        }
+
+        public void startUI() {
+            Scanner scanner = new Scanner(System.in);
+            String input, output = "";
+            ApiProvider apiProvider = new ApiProvider(programArguments);
+            do {
+                input = scanner.nextLine();
+                switch (input) {
+                    case "new" -> output = apiProvider.getNew();
+                    case "featured" -> output = apiProvider.getFeatured();
+                    case "categories" -> output = apiProvider.getCategories();
+                    case "exit" -> output = apiProvider.getExit();
+                    case "auth" -> {
+                        output = apiProvider.authorize();
+                        apiProvider.setAuthorization(true);
+                    }
+                    default -> {
+                        if (input.contains("playlists")) {
+                            output = apiProvider.getPlaylists(input.split(" ")[1]);
+                        }
+                    }
+                }
+                System.out.println(output);
+            } while (!input.equals("exit"));
+        }
+    }
+  learner_created: true
+- name: src/advisor/providers/SharedData.java
+  visible: true
+  text: |
+    package advisor.utils;
+
+    public class SharedData {
+        private String authCode;
+        private boolean hasCode = false;
+
+        public String getAuthCode() {
+            return authCode;
+        }
+
+        public void setAuthCode(String authCode) {
+            this.authCode = authCode;
+        }
+
+        public void setHasCode(boolean hasCode) {
+            this.hasCode = hasCode;
+        }
+
+        public boolean isHasCode() {
+            return hasCode;
+        }
+    }
+  learner_created: true
+- name: src/advisor/models/OAuthModel.java
+  visible: true
+  text: |
+    package advisor.models;
+
+    import advisor.server.AuthServer;
+
+    import java.io.IOException;
+
+    public class OauthModel {
+        private StringBuilder stringBuilder;
+        private AuthServer authServer;
+        {
+            try {
+                authServer = new AuthServer(this.sharedData);
+                authServer.startServer();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        public
+    }
+  learner_created: true
+- name: src/advisor/providers/SpotifyProvider.java
+  visible: true
+  learner_created: true
+feedback_link: https://hyperskill.org/learn/step/5480#comment
+status: Solved
+feedback:
+  message: Congratulations!
+  time: "Tue, 20 Jun 2023 00:26:50 UTC"
+record: 4

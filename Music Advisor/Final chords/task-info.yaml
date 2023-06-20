@@ -1058,6 +1058,636 @@ files:
         }
     }
   learner_created: false
-feedback_link: https://hyperskill.org/projects/62/stages/339/implement#comment
-status: Unchecked
+- name: src/advisor/utils/ProgramArguments.java
+  visible: true
+  text: |
+    package advisor.utils;
+    import org.kohsuke.args4j.CmdLineException;
+    import org.kohsuke.args4j.CmdLineParser;
+    import org.kohsuke.args4j.Option;
+
+    public class ProgramArguments {
+        @Option(name= "-access", usage = "Spotify Server Path")
+        private String serverPath = "https://accounts.spotify.com";
+
+        @Option(name= "-resource", usage = "Spotify API Path")
+        private String apiPath = "https://api.spotify.com";
+
+        public String getApiPath() {
+    //        System.out.println(apiPath);
+            return apiPath;
+        }
+
+        public void setApiPath(String apiPath) {
+            this.apiPath = apiPath;
+        }
+
+        public String getServerPath() {
+            return serverPath;
+        }
+
+        public void setServerPath(String serverPath) {
+            this.serverPath = serverPath;
+        }
+    }
+  learner_created: true
+- name: src/advisor/server/AuthServer.java
+  visible: true
+  text: |
+    package advisor.server;
+
+    import advisor.server.handlers.SpotifyHandler;
+    import advisor.providers.SharedData;
+    import com.sun.net.httpserver.HttpServer;
+
+    import java.io.IOException;
+    import java.net.InetSocketAddress;
+
+    public class AuthServer {
+        final static int port = 8080;
+        final private HttpServer server;
+
+        public AuthServer(SharedData sharedData) throws IOException {
+            server = HttpServer.create(new InetSocketAddress(port), 0);
+
+            SpotifyHandler spotifyHandler = new SpotifyHandler(sharedData);
+            server.createContext("/login", spotifyHandler);
+        }
+
+        public void startServer() {
+            server.start();
+    //        System.out.println("Servidor iniciado en el puerto " + port);
+        }
+
+        public void stopServer() {
+    //        System.out.println("Server fin");
+            server.stop(1);
+        }
+    }
+  learner_created: true
+- name: src/advisor/providers/SpotifyProvider.java
+  visible: true
+  text: |
+    package advisor.providers;
+
+    import advisor.utils.ProgramArguments;
+    import com.google.gson.JsonArray;
+    import com.google.gson.JsonElement;
+    import com.google.gson.JsonObject;
+    import com.google.gson.JsonParser;
+
+    import java.io.IOException;
+    import java.net.URI;
+    import java.net.http.HttpClient;
+    import java.net.http.HttpRequest;
+    import java.net.http.HttpResponse;
+    import java.text.SimpleDateFormat;
+    import java.util.Date;
+
+    public class SpotifyProvider {
+        private final JsonObject tokenObject;
+        private final HttpClient httpClient;
+        private final ProgramArguments programArguments;
+
+        public SpotifyProvider(JsonObject tokenObject, ProgramArguments programArguments) {
+            this.tokenObject = tokenObject;
+            this.programArguments = programArguments;
+        }
+
+        {
+            httpClient = HttpClient.newBuilder().build();
+        }
+
+        public String getCategories() throws IOException, InterruptedException {
+            String uri = this.programArguments.getApiPath()
+                    .concat("/v1/browse/categories?country=MX&locale=mx_MX&limit=10&offset=5");
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(uri))
+                    .header("Authorization", "Bearer " + tokenObject.get("access_token").getAsString())
+                    .GET()
+                    .build();
+            HttpResponse<String> httpResponse = this.httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            JsonObject jsonObject = JsonParser.parseString(httpResponse.body()).getAsJsonObject();
+            JsonObject categories = jsonObject.getAsJsonObject("categories");
+            JsonArray items = categories.getAsJsonArray("items");
+
+            StringBuilder response = new StringBuilder();
+            for (JsonElement item : items) {
+                response.append(item.getAsJsonObject().get("name").getAsString()).append("\n");
+            }
+            return response.toString().strip();
+        }
+
+        public String getNew() throws IOException, InterruptedException {
+            String uri = this.programArguments.getApiPath()
+                    .concat("/v1/browse/new-releases?country=MX&limit=10&offset=5");
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(uri))
+                    .header("Authorization", "Bearer " + tokenObject.get("access_token").getAsString())
+                    .GET()
+                    .build();
+            HttpResponse<String> httpResponse = this.httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            JsonObject jsonObject = JsonParser.parseString(httpResponse.body()).getAsJsonObject();
+            JsonObject albums = jsonObject.getAsJsonObject("albums");
+            JsonArray items = albums.getAsJsonArray("items");
+
+            StringBuilder response = new StringBuilder();
+            for (JsonElement item : items) {
+                response.append(item.getAsJsonObject().get("name").getAsString()).append("\n[");
+                JsonArray artists = item.getAsJsonObject().getAsJsonArray("artists");
+                for (JsonElement artist : artists) {
+                    response.append(artist.getAsJsonObject().get("name").getAsString())
+                            .append(", ");
+                }
+                response.replace(response.length() - 2, response.length(), "]\n");
+                JsonObject external_urls = item.getAsJsonObject()
+                        .getAsJsonObject("external_urls");
+                response.append(external_urls.get("spotify").getAsString())
+                        .append("\n\n");
+            }
+            return response.toString().strip();
+        }
+
+        public String getFeatured() throws IOException, InterruptedException {
+            String uri = this.programArguments.getApiPath()
+                    .concat("/v1/browse/featured-playlists?country=MX&locale=mx_MX&limit=10&offset=5&timestamp=");
+            SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyy-MM-dd'T'HH:mm:ss");
+            String timeStamp = simpleDateFormat.format(new Date());
+
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(uri.concat(timeStamp)))
+                    .header("Authorization", "Bearer " + tokenObject.get("access_token").getAsString())
+                    .GET()
+                    .build();
+            HttpResponse<String> httpResponse = this.httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            JsonObject jsonObject = JsonParser.parseString(httpResponse.body()).getAsJsonObject();
+            JsonObject playlists = jsonObject.getAsJsonObject("playlists");
+            JsonArray items = playlists.getAsJsonArray("items");
+
+            StringBuilder response = new StringBuilder();
+            for (JsonElement item : items) {
+                response.append(item.getAsJsonObject().get("name").getAsString()).append("\n");
+                JsonObject external_urls = item.getAsJsonObject()
+                        .getAsJsonObject("external_urls");
+                response.append(external_urls.get("spotify").getAsString())
+                        .append("\n\n");
+            }
+            return response.toString().strip();
+        }
+
+        public String getPlaylists(String mood) throws IOException, InterruptedException {
+            String uri = this.programArguments.getApiPath()
+                    .concat("/v1/browse/categories/")
+                    .concat(mood)
+                    .concat("/playlists")
+                    .concat("?country=MX&limit=10&offset=5");
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(uri))
+                    .header("Authorization", "Bearer " + tokenObject.get("access_token").getAsString())
+                    .GET()
+                    .build();
+            HttpResponse<String> httpResponse = this.httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            JsonObject jsonObject = JsonParser.parseString(httpResponse.body()).getAsJsonObject();
+            if (httpResponse.statusCode() != 200) {
+                return jsonObject.getAsJsonObject("error")
+                        .getAsJsonObject("message")
+                        .getAsString();
+            }
+            JsonObject playlists = jsonObject.getAsJsonObject("playlists");
+            JsonArray items = playlists.getAsJsonArray("items");
+
+            StringBuilder response = new StringBuilder();
+            for (JsonElement item : items) {
+                JsonObject playlist = item.getAsJsonObject();
+                response.append(playlist.get("name").getAsString());
+                response.append("\n");
+                response.append(playlist.getAsJsonObject("external_urls").get("spotify").getAsString());
+                response.append("\n\n");
+            }
+            return response.toString();
+        }
+
+    }
+  learner_created: true
+- name: src/advisor/utils/HttpUtilQueries.java
+  visible: true
+  text: |
+    package advisor.utils;
+
+    import java.io.IOException;
+    import java.net.URI;
+    import java.net.http.HttpClient;
+    import java.net.http.HttpRequest;
+    import java.net.http.HttpResponse;
+    import java.util.Base64;
+
+    public class HttpUtilQueries {
+
+        HttpClient httpClient;
+
+        public HttpUtilQueries() {
+        }
+
+        {
+            httpClient = HttpClient.newBuilder().build();
+        }
+
+        public void getRequest(String uri) throws IOException, InterruptedException {
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(uri))
+                    .GET()
+                    .build();
+            HttpResponse<String> httpResponse = this.httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            System.out.println(httpResponse.body());
+        }
+
+        public HttpResponse<String> postRequest(String uri, String request) throws IOException, InterruptedException {
+            String client_id = "309d98be14e14df9bdfe3bf3a4366ffd";
+            String client_secret = "5ea58477b4e44e73b806061cf767afa3";
+            String credentials = Base64.getEncoder().encodeToString((client_id + ":" + client_secret).getBytes());
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(uri))
+                    .header("Authorization", "Basic " + credentials)
+                    .header("Content-Type", "application/x-www-form-urlencoded")
+                    .POST(HttpRequest.BodyPublishers.ofString(request))
+                    .build();
+            return this.httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+        }
+
+    }
+  learner_created: true
+- name: src/advisor/providers/SharedData.java
+  visible: true
+  text: |
+    package advisor.providers;
+
+    public class SharedData {
+        private String authCode;
+        private boolean hasCode = false;
+
+        public String getAuthCode() {
+            return authCode;
+        }
+
+        public void setAuthCode(String authCode) {
+            this.authCode = authCode;
+        }
+
+        public void setHasCode(boolean hasCode) {
+            this.hasCode = hasCode;
+        }
+
+        public boolean isHasCode() {
+            return hasCode;
+        }
+    }
+  learner_created: true
+- name: src/advisor/providers/ApiProvider.java
+  visible: true
+  text: |
+    package advisor.providers;
+
+    import advisor.models.OAuthModel;
+    import advisor.utils.ProgramArguments;
+
+    import java.io.IOException;
+
+    public class ApiProvider {
+        private final ProgramArguments programArguments;
+        private final OAuthModel oAuthModel;
+        private SpotifyProvider spotifyProvider;
+        private Boolean authorization;
+
+        public ApiProvider(ProgramArguments programArguments) {
+            this.programArguments = programArguments;
+            this.oAuthModel = new OAuthModel(programArguments);
+            this.authorization = false;
+        }
+
+
+        //    featured — a list of Spotify-featured playlists with their links fetched from API;
+        public void getFeatured() {
+            if (!authorization) {
+                System.out.println("Please, provide access for application.");
+                return;
+            }
+            try {
+                System.out.println(this.spotifyProvider.getFeatured());
+            } catch (IOException | InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        //    new — a list of new albums with artists and links on Spotify;
+        public void getNew() {
+            if (!authorization) {
+                System.out.println("Please, provide access for application.");
+                return;
+            }
+            try {
+                System.out.println(this.spotifyProvider.getNew());
+            } catch (IOException | InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        //    categories — a list of all available categories on Spotify (just their names);
+        public void getCategories() {
+            if (!authorization) {
+                System.out.println("Please, provide access for application.");
+                return;
+            }
+            try {
+                System.out.println(this.spotifyProvider.getCategories());
+            } catch (IOException | InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        //    playlists C_NAME, where C_NAME is the name of category. The list contains playlists of this category and their links on Spotify;
+
+        public void getPlaylists(String mood) {
+            if (!authorization) {
+                System.out.println("Please, provide access for application.");
+                return;
+            }
+            try {
+                System.out.println(this.spotifyProvider.getPlaylists(mood));
+            } catch (IOException | InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        //    exit shuts down the application.
+        public void getExit() {
+            System.exit(0);
+        }
+
+        public void authorize() {
+            oAuthModel.getUserAuth();
+            oAuthModel.waitAuth();
+            oAuthModel.reqToken();
+            this.authorization = oAuthModel.getAuth();
+            if (this.authorization) {
+                spotifyProvider = new SpotifyProvider(oAuthModel.getToken(), programArguments);
+                System.out.println("Success!");
+            } else {
+                System.out.println("Error :(");
+            }
+        }
+
+    }
+  learner_created: true
+- name: src/advisor/models/OAuthModel.java
+  visible: true
+  text: |
+    package advisor.models;
+
+    import advisor.providers.SharedData;
+    import advisor.server.AuthServer;
+    import advisor.utils.HttpUtilQueries;
+    import advisor.utils.ProgramArguments;
+    import com.google.gson.JsonObject;
+    import com.google.gson.JsonParser;
+
+    import java.io.IOException;
+    import java.net.URLEncoder;
+    import java.net.http.HttpResponse;
+    import java.nio.charset.StandardCharsets;
+    import java.text.MessageFormat;
+
+    public class OAuthModel {
+        private final SharedData sharedData;
+        private final ProgramArguments programArguments;
+        private final HttpUtilQueries httpUtilQueries;
+        private AuthServer authServer;
+        private JsonObject tokenObject;
+
+        private Boolean authorization;
+
+        {
+            this.sharedData = new SharedData();
+        }
+
+        public OAuthModel(ProgramArguments programArguments) {
+            this.programArguments = programArguments;
+            this.httpUtilQueries = new HttpUtilQueries();
+            this.initializeServer();
+        }
+
+        private void initializeServer() {
+            try {
+                authServer = new AuthServer(this.sharedData);
+                authServer.startServer();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        public void getUserAuth() {
+            System.out.println(MessageFormat.format("use this link to request the access code:\n{0}/authorize?client_id=309d98be14e14df9bdfe3bf3a4366ffd&redirect_uri=http://127.0.0.1:8080/login&response_type=code\nwaiting for code...", programArguments.getServerPath()));
+        }
+
+        public void waitAuth() {
+            do {
+                synchronized (sharedData) {
+                    try {
+                        sharedData.wait();
+                        authorization = sharedData.isHasCode();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            } while (!authorization);
+            this.stopServer();
+            System.out.println(sharedData.isHasCode() ? "code received" : "code denied");
+        }
+
+        public void stopServer(){
+            authServer.stopServer();
+        }
+
+        public void reqToken() {
+            if (authorization) {
+                try {
+                    System.out.println("making http request for access_token...");
+                    String requestBody =
+                            "code=" + URLEncoder.encode(sharedData.getAuthCode(), StandardCharsets.UTF_8)
+                                    + "&redirect_uri=" + URLEncoder.encode("http://127.0.0.1:8080/login", StandardCharsets.UTF_8)
+                                    + "&grant_type=authorization_code";
+                    HttpResponse<String> response = httpUtilQueries.postRequest(
+                            programArguments.getServerPath() + "/api/token",
+                            requestBody
+                    );
+                    if (response.statusCode() == 200) {
+    //                    System.out.println("response:\n" + response.body());
+                        this.tokenObject = JsonParser.parseString(response.body()).getAsJsonObject();
+                    }
+                } catch (IOException | InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+
+        public boolean getAuth() {
+            return this.authorization;
+        }
+
+        public JsonObject getToken() {
+            return tokenObject;
+        }
+    }
+  learner_created: true
+- name: src/advisor/server/handlers/SpotifyHandler.java
+  visible: true
+  text: |
+    package advisor.server.handlers;
+
+    import advisor.providers.SharedData;
+    import com.sun.net.httpserver.HttpExchange;
+    import com.sun.net.httpserver.HttpHandler;
+
+    import java.io.IOException;
+    import java.io.OutputStream;
+
+    public class SpotifyHandler implements HttpHandler {
+        private final SharedData sharedData;
+
+        public SpotifyHandler(SharedData sharedData) {
+            this.sharedData = sharedData;
+        }
+
+        protected String code;
+
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+    //        System.out.println("Entre al handler");
+    //        System.out.println(exchange);
+            String response = "";
+    //        System.out.println(exchange.getRequestURI());
+
+            String query = exchange.getRequestURI().getQuery();
+    //        System.out.println(query);
+    //        if(query.equals(null)) throw new RuntimeException("Error null");
+            if(query == null || !query.contains("code")){
+                response = "Authorization code not found. Try again.";
+    //            System.out.println(response);
+                exchange.sendResponseHeaders(400, response.getBytes().length);
+
+                OutputStream outputStream = exchange.getResponseBody();
+                outputStream.write(response.getBytes());
+                outputStream.flush();
+                outputStream.close();
+
+                sharedData.setHasCode(false);
+
+            } else {
+                response = "Got the code. Return back to your program.";
+    //            System.out.println(response);
+                exchange.sendResponseHeaders(200, response.getBytes().length);
+
+                OutputStream outputStream = exchange.getResponseBody();
+                outputStream.write(response.getBytes());
+                outputStream.flush();
+                outputStream.close();
+                String code = query.split("=")[1];
+
+                sharedData.setAuthCode(code);
+                sharedData.setHasCode(true);
+
+            }
+    //        exchange.getResponseHeaders().set("Content-Type", "text/plain");
+
+            synchronized (sharedData) {
+                sharedData.notify();
+            }
+    //        else if(requestPath.equals("/"))
+        }
+
+    }
+  learner_created: true
+- name: src/advisor/controllers/MenuApp.java
+  visible: true
+  text: |
+    package advisor.application;
+
+    import advisor.providers.ApiProvider;
+    import advisor.utils.ProgramArguments;
+
+    import java.util.Scanner;
+
+    public class MenuApp {
+        private final ProgramArguments programArguments;
+
+        public MenuApp(ProgramArguments programArguments) {
+            this.programArguments = programArguments;
+        }
+
+        public void startUI() {
+            Scanner scanner = new Scanner(System.in);
+            String input;
+            ApiProvider apiProvider = new ApiProvider(programArguments);
+            do {
+                input = scanner.nextLine();
+                switch (input) {
+                    case "new" -> apiProvider.getNew();
+                    case "featured" -> apiProvider.getFeatured();
+                    case "categories" -> apiProvider.getCategories();
+                    case "exit" -> apiProvider.getExit();
+                    case "auth" -> apiProvider.authorize();
+                    default -> {
+                        if (input.contains("playlists")) {
+                            apiProvider.getPlaylists(input.split(" ")[1]);
+                        }
+                    }
+                }
+            } while (!input.equals("exit"));
+        }
+    }
+  learner_created: true
+- name: src/advisor/utils/strategy/Printer.java
+  visible: true
+  learner_created: true
+- name: src/advisor/utils/concreteStrat/CategoryPrinter.java
+  visible: true
+  learner_created: true
+- name: src/advisor/utils/concreteStrat/NewPrinter.java
+  visible: true
+  learner_created: true
+- name: src/advisor/utils/concreteStrat/FeaturedPrinter.java
+  visible: true
+  learner_created: true
+- name: src/advisor/utils/concreteStrat/PlaylistPrinter.java
+  visible: true
+  learner_created: true
+- name: src/advisor/utils/context/TypePrinter.java
+  visible: true
+  learner_created: true
+- name: src/advisor/models/Category.java
+  visible: true
+  learner_created: true
+- name: src/advisor/models/Featured.java
+  visible: true
+  learner_created: true
+- name: src/advisor/models/New.java
+  visible: true
+  learner_created: true
+- name: src/advisor/models/Playlist.java
+  visible: true
+  learner_created: true
+- name: src/advisor/utils/concreteStrat/StrategyBase.java
+  visible: true
+  learner_created: true
+- name: src/advisor/models/Pair.java
+  visible: true
+  learner_created: true
+feedback_link: https://hyperskill.org/learn/step/5481#comment
+status: Solved
+feedback:
+  message: Well done! You've finished the project. Select a new project on <a href="https://hyperskill.org/projects">Hyperskill</a>
+    to continue learning.
+  time: "Tue, 20 Jun 2023 23:22:48 UTC"
 record: -1

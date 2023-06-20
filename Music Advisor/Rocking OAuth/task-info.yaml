@@ -124,6 +124,67 @@ files:
         }
     }
   learner_created: false
-feedback_link: https://hyperskill.org/projects/62/stages/336/implement#comment
-status: Unchecked
-record: -1
+- name: src/advisor/ApiProvider.java
+  visible: true
+  text: |
+    package advisor;
+
+    public class ApiProvider {
+        public ApiProvider() {
+        }
+
+        //    featured — a list of Spotify-featured playlists with their links fetched from API;
+        //    new — a list of new albums with artists and links on Spotify;
+        //    categories — a list of all available categories on Spotify (just their names);
+        //    playlists C_NAME, where C_NAME is the name of category. The list contains playlists of this category and their links on Spotify;
+        //    exit shuts down the application.
+        static public String getFeatured() {
+            return """
+                    ---FEATURED---
+                    Mellow Morning
+                    Wake Up and Smell the Coffee
+                    Monday Motivation
+                    Songs to Sing in the Shower""";
+        }
+
+        static public String getNew(){
+            return """
+                    ---NEW RELEASES---
+                    Mountains [Sia, Diplo, Labrinth]
+                    Runaway [Lil Peep]
+                    The Greatest Show [Panic! At The Disco]
+                    All Out Life [Slipknot]""";
+        }
+
+        static public String getCategories(){
+            return """
+                    ---CATEGORIES---
+                    Top Lists
+                    Pop
+                    Mood
+                    Latin""";
+        }
+
+        static public String getPlaylists(String mood){
+            StringBuilder stringBuilder = new StringBuilder("""
+                    ---MOOD PLAYLISTS---
+                    Walk Like A Badass \\s
+                    Rage Beats \\s
+                    Arab Mood Booster \\s
+                    Sunday Stroll\"""");
+            return stringBuilder.replace(3, 6, mood).toString();
+        }
+
+        static public String getExit(){
+            return """
+                    ---GOODBYE!---""";
+        }
+
+    }
+  learner_created: true
+feedback_link: https://hyperskill.org/learn/step/5478#comment
+status: Solved
+feedback:
+  message: Congratulations!
+  time: "Sun, 11 Jun 2023 20:44:24 UTC"
+record: 2

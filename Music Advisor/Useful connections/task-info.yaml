@@ -300,6 +300,109 @@ files:
         }
     }
   learner_created: false
-feedback_link: https://hyperskill.org/projects/62/stages/337/implement#comment
-status: Unchecked
-record: -1
+- name: src/advisor/providers/ApiProvider.java
+  visible: true
+  text: |
+    package advisor;
+
+    public class ApiProvider {
+        public boolean authorization;
+
+        public ApiProvider() {
+        }
+
+        public void setAuthorization(boolean auth) {
+            this.authorization = auth;
+        }
+
+        public boolean getAuth() {
+            return this.authorization;
+        }
+
+        //    featured — a list of Spotify-featured playlists with their links fetched from API;
+        //    new — a list of new albums with artists and links on Spotify;
+        //    categories — a list of all available categories on Spotify (just their names);
+        //    playlists C_NAME, where C_NAME is the name of category. The list contains playlists of this category and their links on Spotify;
+        //    exit shuts down the application.
+        public String getFeatured() {
+            if (!authorization) return "Please, provide access for application.";
+            return """
+                    ---FEATURED---
+                    Mellow Morning
+                    Wake Up and Smell the Coffee
+                    Monday Motivation
+                    Songs to Sing in the Shower""";
+        }
+
+        public String getNew() {
+            if (!authorization) return "Please, provide access for application.";
+            return """
+                    ---NEW RELEASES---
+                    Mountains [Sia, Diplo, Labrinth]
+                    Runaway [Lil Peep]
+                    The Greatest Show [Panic! At The Disco]
+                    All Out Life [Slipknot]""";
+        }
+
+        public String getCategories() {
+            if (!authorization) return "Please, provide access for application.";
+            return """
+                    ---CATEGORIES---
+                    Top Lists
+                    Pop
+                    Mood
+                    Latin""";
+        }
+
+        public String getPlaylists(String mood) {
+            if (!authorization) return "Please, provide access for application.";
+            StringBuilder stringBuilder = new StringBuilder("""
+                    ---MOOD PLAYLISTS---
+                    Walk Like A Badass \\s
+                    Rage Beats \\s
+                    Arab Mood Booster \\s
+                    Sunday Stroll\"""");
+            return stringBuilder.replace(3, 6, mood).toString();
+        }
+
+        public String getExit() {
+            return """
+                    ---GOODBYE!---""";
+        }
+
+        public String authorize() {
+            return """
+                    https://accounts.spotify.com/authorize?client_id=a19ee7dbfda443b2a8150c9101bfd645&redirect_uri=http://localhost:8080&response_type=code
+                    ---SUCCESS---
+                    """;
+        }
+
+    }
+  learner_created: true
+- name: src/advisor/server/handlers/SpotifyHandler.java
+  visible: true
+  learner_created: true
+- name: src/advisor/utils/HttpUtilQueries.java
+  visible: true
+  learner_created: true
+- name: src/advisor/utils/MenuApp.java
+  visible: true
+  learner_created: true
+- name: src/advisor/server/AuthServer.java
+  visible: true
+  learner_created: true
+- name: src/advisor/utils/SharedData.java
+  visible: true
+  learner_created: true
+- name: src/advisor/utils/ProgramArguments.java
+  visible: true
+  learner_created: true
+- name: src/advisor/models/OauthModel.java
+  visible: true
+  learner_created: true
+feedback_link: https://hyperskill.org/learn/step/5479#comment
+status: Solved
+feedback:
+  message: Congratulations!
+  time: "Wed, 14 Jun 2023 00:20:03 UTC"
+record: 3

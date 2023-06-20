@@ -10,6 +10,7 @@ repositories {
 
 dependencies {
     implementation 'com.google.code.gson:gson:+'
+    implementation 'args4j:args4j:2.33'
 }
 
 jar {
